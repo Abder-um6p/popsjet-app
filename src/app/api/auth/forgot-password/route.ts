@@ -1,70 +1,46 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createServerClient } from '@supabase/ssr'
-import { cookies } from 'next/headers'
+import { createClient } from '@supabase/supabase-js'
+
+/** Admin client pour contourner la limite de 2 emails/h en anon */
+function getAdminClient() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    { auth: { autoRefreshToken: false, persistSession: false } }
+  )
+}
 
 export async function POST(req: NextRequest) {
   try {
     const { email } = await req.json()
     if (!email) return NextResponse.json({ error: 'Email requis' }, { status: 400 })
 
-    const cookieStore = await cookies()
-    const supabase = createServerClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-      {
-        cookies: {
-          getAll: () => cookieStore.getAll(),
-          setAll: (toSet) => toSet.forEach(({ name, value, options }) =>
-            cookieStore.set(name, value, options)
-          ),
-        },
-      }
-    )
+    const adminClient = getAdminClient()
 
-    // Find user by email
-    const { data: profile, error: profileError } = await supabase
+    // Vérifier que le compte existe et n'est pas désactivé
+    const { data: profile } = await adminClient
       .from('profiles')
-      .select('id, email, disabled_at')
-      .eq('email', email)
-      .single()
-
-    if (profileError || !profile) {
-      // Don't reveal whether the email exists — always return success
-      return NextResponse.json({ ok: true })
-    }
-
-    if (profile.disabled_at) {
-      // Account is disabled — still don't reveal, just silently ignore
-      return NextResponse.json({ ok: true })
-    }
-
-    // Check for existing pending request (avoid duplicates in last 10 min)
-    const tenMinutesAgo = new Date(Date.now() - 10 * 60 * 1000).toISOString()
-    const { data: existing } = await supabase
-      .from('password_reset_requests')
-      .select('id')
-      .eq('user_id', profile.id)
-      .eq('status', 'pending')
-      .gte('requested_at', tenMinutesAgo)
+      .select('id, disabled_at')
+      .eq('email', email.trim().toLowerCase())
       .maybeSingle()
 
-    if (existing) {
-      // Already has a recent pending request — silently succeed
+    // Toujours renvoyer ok=true pour ne pas révéler si l'email existe
+    if (!profile || profile.disabled_at) {
       return NextResponse.json({ ok: true })
     }
 
-    // Create the pending reset request
-    const { error: insertError } = await supabase
-      .from('password_reset_requests')
-      .insert({
-        user_id: profile.id,
-        email: profile.email,
-        status: 'pending',
-      })
+    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://popsjet-app.vercel.app'
+    const redirectTo = `${siteUrl}/auth/callback?next=/auth/reset-password`
 
-    if (insertError) {
-      console.error('Reset request insert error:', insertError)
-      return NextResponse.json({ error: 'Erreur lors de la demande' }, { status: 500 })
+    const { error } = await adminClient.auth.resetPasswordForEmail(
+      email.trim().toLowerCase(),
+      { redirectTo }
+    )
+
+    if (error) {
+      console.error('resetPasswordForEmail error:', error)
+      // Ne pas révéler les détails de l'erreur
+      return NextResponse.json({ ok: true })
     }
 
     return NextResponse.json({ ok: true })

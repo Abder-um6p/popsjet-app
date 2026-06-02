@@ -62,11 +62,13 @@ export async function POST(
   }
 
   const adminAuthClient = getAdminAuthClient()
-  const origin = req.headers.get('origin') ?? process.env.NEXT_PUBLIC_APP_URL ?? ''
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL
+    ?? req.headers.get('origin')
+    ?? 'https://popsjet-app.vercel.app'
 
   const { error: resetError } = await adminAuthClient.auth.resetPasswordForEmail(
     targetProfile.email,
-    { redirectTo: `${origin}/auth/reset-password` }
+    { redirectTo: `${siteUrl}/auth/callback?next=/auth/reset-password` }
   )
 
   if (resetError) {

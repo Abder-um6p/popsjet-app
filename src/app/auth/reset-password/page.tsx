@@ -74,19 +74,21 @@ export default function ResetPasswordPage() {
   const [done, setDone] = useState(false)
 
   useEffect(() => {
-    // Supabase sets the session from the URL hash on the client automatically
-    // We just need to verify the user is authenticated via the recovery token
     const supabase = createClient()
-    supabase.auth.onAuthStateChange((event) => {
-      if (event === 'PASSWORD_RECOVERY') {
+
+    // Vérifier la session existante (flux PKCE via callback)
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session) setReady(true)
+    })
+
+    // Écouter les événements auth — PASSWORD_RECOVERY (hash) ou SIGNED_IN (PKCE)
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'PASSWORD_RECOVERY' || (event === 'SIGNED_IN' && session)) {
         setReady(true)
       }
     })
 
-    // Also check if already has a session (fallback)
-    supabase.auth.getUser().then(({ data: { user } }) => {
-      if (user) setReady(true)
-    })
+    return () => subscription.unsubscribe()
   }, [])
 
   async function handleSubmit(e: React.FormEvent) {
@@ -112,7 +114,15 @@ export default function ResetPasswordPage() {
 
     setDone(true)
     toast.success('Mot de passe mis à jour !')
-    setTimeout(() => router.push('/dashboard'), 2500)
+    // Vérifier si l'onboarding est complété (user invité → onboarding, sinon dashboard)
+    const supabase2 = createClient()
+    const { data: { user: u } } = await supabase2.auth.getUser()
+    if (u) {
+      const { data: profile } = await supabase2.from('profiles').select('onboarding_completed').eq('id', u.id).single()
+      setTimeout(() => router.push(profile?.onboarding_completed ? '/dashboard' : '/auth/onboarding'), 2500)
+    } else {
+      setTimeout(() => router.push('/dashboard'), 2500)
+    }
   }
 
   return (

@@ -39,9 +39,13 @@ export async function POST(req: Request) {
   const now = new Date().toISOString()
 
   // Send invitation email via Supabase Auth
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://popsjet-app.vercel.app'
+
   const { data: invited, error: inviteError } = await adminClient.auth.admin.inviteUserByEmail(email, {
     data: { role, invited_by: user.id },
-    redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL ?? 'http://localhost:3000'}/auth/callback`,
+    // Après clic sur le lien → callback échange le token → redirect vers reset-password
+    // L'utilisateur invité définit son mot de passe, puis est redirigé vers l'onboarding
+    redirectTo: `${siteUrl}/auth/callback?next=/auth/reset-password`,
   })
 
   if (inviteError) {

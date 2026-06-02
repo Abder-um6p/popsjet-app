@@ -11,7 +11,6 @@ export async function GET(request: NextRequest) {
     const { error } = await supabase.auth.exchangeCodeForSession(code)
 
     if (!error) {
-      // Vérifier si l'onboarding est complété
       const { data: { user } } = await supabase.auth.getUser()
       if (user) {
         const { data: profile } = await supabase
@@ -19,6 +18,12 @@ export async function GET(request: NextRequest) {
           .select('onboarding_completed')
           .eq('id', user.id)
           .single()
+
+        // Si next est explicitement reset-password (invitation ou reset),
+        // on l'honore avant de vérifier l'onboarding
+        if (next === '/auth/reset-password') {
+          return NextResponse.redirect(`${origin}/auth/reset-password`)
+        }
 
         if (!profile?.onboarding_completed) {
           return NextResponse.redirect(`${origin}/auth/onboarding`)

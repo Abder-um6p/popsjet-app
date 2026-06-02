@@ -54,17 +54,17 @@ export default function ForgotPasswordPage() {
                 <Clock className="w-8 h-8 text-blue-500" />
               </div>
               <div>
-                <h2 className="text-xl font-semibold text-gray-900">Demande envoyée</h2>
+                <h2 className="text-xl font-semibold text-gray-900">Email envoyé !</h2>
                 <p className="text-sm text-gray-500 mt-2 leading-relaxed">
-                  Votre demande de réinitialisation a été transmise à l'administrateur pour validation.
-                  Vous recevrez un email avec le lien une fois approuvée.
+                  Si un compte existe avec cette adresse, vous recevrez un lien
+                  de réinitialisation dans quelques minutes.
                 </p>
               </div>
-              <div className="flex items-start gap-3 p-3 bg-amber-50 border border-amber-100 rounded-xl text-left">
-                <CheckCircle2 className="w-4 h-4 text-amber-500 mt-0.5 shrink-0" />
-                <p className="text-xs text-amber-700">
-                  Cette validation est requise pour des raisons de sécurité.
-                  Le délai est généralement de quelques heures.
+              <div className="flex items-start gap-3 p-3 bg-blue-50 border border-blue-100 rounded-xl text-left">
+                <CheckCircle2 className="w-4 h-4 text-blue-500 mt-0.5 shrink-0" />
+                <p className="text-xs text-blue-700">
+                  Vérifiez votre boîte de réception et vos spams.
+                  Le lien est valable 1 heure.
                 </p>
               </div>
               <Link
