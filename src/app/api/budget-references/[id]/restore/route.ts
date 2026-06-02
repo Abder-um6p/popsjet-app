@@ -22,7 +22,7 @@ export async function POST(
 
   const { data: ref, error: fetchError } = await admin
     .from('budget_references')
-    .select('id, code, label, deleted_at')
+    .select('id, code, designation, deleted_at')
     .eq('id', id)
     .single()
 
@@ -32,11 +32,11 @@ export async function POST(
   const { error: e1 } = await admin
     .from('budget_references').update({ deleted_at: null, deleted_by: null }).eq('id', id)
 
-  if (!e1) return NextResponse.json({ ok: true, code: ref.code, label: ref.label })
+  if (!e1) return NextResponse.json({ ok: true, code: ref.code, designation: ref.designation })
 
   const { error: e2 } = await admin
     .from('budget_references').update({ deleted_at: null }).eq('id', id)
 
   if (e2) return NextResponse.json({ error: e2.message }, { status: 500 })
-  return NextResponse.json({ ok: true, code: ref.code, label: ref.label })
+  return NextResponse.json({ ok: true, code: ref.code, designation: ref.designation })
 }

@@ -19,7 +19,7 @@ export async function GET(_req: NextRequest) {
   // Étape 1 : références supprimées
   const { data: refs, error } = await admin
     .from('budget_references')
-    .select('id, code, label, program_id, created_by, deleted_at, created_at')
+    .select('id, code, designation, program_id, created_by, deleted_at, created_at')
     .not('deleted_at', 'is', null)
     .order('deleted_at', { ascending: false })
 
