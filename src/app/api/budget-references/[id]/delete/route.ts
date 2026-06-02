@@ -80,7 +80,7 @@ export async function DELETE(
   return NextResponse.json({
     ok: true,
     code: ref.code,
-    label: ref.label,
+    label: ref.designation,
     warnings: linkedTasksCount > 0 || linkedExpensesCount > 0
       ? {
           linked_tasks:    linkedTasksCount,
