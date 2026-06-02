@@ -7,6 +7,8 @@ const PUBLIC_ROUTES = [
   '/auth/callback',
   '/auth/invite',
   '/auth/reset-password',
+  '/auth/forgot-password',
+  '/auth/onboarding',
 ]
 
 // Routes réservées à certains rôles

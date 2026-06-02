@@ -80,7 +80,7 @@ export default function ForgotPasswordPage() {
               <div className="mb-6">
                 <h2 className="text-xl font-semibold text-gray-800">Mot de passe oublié</h2>
                 <p className="text-sm text-gray-500 mt-1">
-                  Entrez votre email — un administrateur validera votre demande et vous enverra un lien.
+                  Entrez votre email pour recevoir un lien de réinitialisation.
                 </p>
               </div>
 
