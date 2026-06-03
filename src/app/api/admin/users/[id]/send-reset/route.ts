@@ -62,18 +62,49 @@ export async function POST(
   }
 
   const adminAuthClient = getAdminAuthClient()
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL
-    ?? req.headers.get('origin')
-    ?? 'https://popsjet-app.vercel.app'
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://popsjet-app.vercel.app'
 
-  const { error: resetError } = await adminAuthClient.auth.resetPasswordForEmail(
-    targetProfile.email,
-    { redirectTo: `${siteUrl}/auth/reset-password` }
-  )
+  const { data: linkData, error: linkError } = await adminAuthClient.auth.admin.generateLink({
+    type: 'recovery',
+    email: targetProfile.email,
+    options: { redirectTo: `${siteUrl}/auth/reset-password` },
+  })
 
-  if (resetError) {
-    console.error('Admin send-reset error:', resetError)
-    return NextResponse.json({ error: 'Erreur lors de l\'envoi du lien' }, { status: 500 })
+  if (linkError || !linkData?.properties?.action_link) {
+    console.error('Admin generateLink error:', linkError)
+    return NextResponse.json({ error: 'Erreur lors de la génération du lien' }, { status: 500 })
+  }
+
+  const recoveryLink = linkData.properties.action_link
+  const fromEmail = process.env.RESEND_FROM_EMAIL ?? 'onboarding@resend.dev'
+  const resendKey = process.env.RESEND_API_KEY
+
+  if (!resendKey) {
+    return NextResponse.json({ error: 'RESEND_API_KEY manquant' }, { status: 500 })
+  }
+
+  const emailRes = await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: { 'Authorization': `Bearer ${resendKey}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      from: `PopsJet <${fromEmail}>`,
+      to: [targetProfile.email],
+      subject: 'Réinitialisation de votre mot de passe — PopsJet',
+      html: `<div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:32px 24px">
+        <h1 style="font-size:24px;font-weight:700;color:#111">PopsJet</h1>
+        <p style="color:#444;margin-top:16px">Un administrateur vous a envoyé un lien de réinitialisation.</p>
+        <a href="${recoveryLink}" style="display:inline-block;margin-top:24px;padding:12px 28px;background:#2563eb;color:#fff;text-decoration:none;border-radius:8px;font-weight:600">
+          Réinitialiser mon mot de passe
+        </a>
+        <p style="color:#888;font-size:13px;margin-top:24px">Ce lien est valable 1 heure.</p>
+      </div>`,
+    }),
+  })
+
+  if (!emailRes.ok) {
+    const errBody = await emailRes.text()
+    console.error('Resend error:', emailRes.status, errBody)
+    return NextResponse.json({ error: 'Erreur envoi email' }, { status: 500 })
   }
 
   return NextResponse.json({ ok: true })

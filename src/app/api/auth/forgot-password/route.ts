@@ -5,13 +5,7 @@ function getAdminClient() {
   return createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    {
-      auth: {
-        autoRefreshToken: false,
-        persistSession: false,
-        flowType: 'implicit', // Évite le PKCE côté serveur — le lien arrive en hash sur /auth/reset-password
-      },
-    }
+    { auth: { autoRefreshToken: false, persistSession: false } }
   )
 }
 
@@ -35,14 +29,61 @@ export async function POST(req: NextRequest) {
 
     const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://popsjet-app.vercel.app'
 
-    // Implicit flow → Supabase envoie un email avec lien #access_token=...&type=recovery
-    // Le client JS le traite via onAuthStateChange(PASSWORD_RECOVERY) sur /auth/reset-password
-    const { error } = await adminClient.auth.resetPasswordForEmail(
-      email.trim().toLowerCase(),
-      { redirectTo: `${siteUrl}/auth/reset-password` }
-    )
+    // Générer le lien de récupération via l'API admin (pas de PKCE)
+    // Le lien redirige vers /auth/reset-password#access_token=...&type=recovery
+    const { data: linkData, error: linkError } = await adminClient.auth.admin.generateLink({
+      type: 'recovery',
+      email: email.trim().toLowerCase(),
+      options: { redirectTo: `${siteUrl}/auth/reset-password` },
+    })
 
-    if (error) console.error('resetPasswordForEmail error:', error)
+    if (linkError || !linkData?.properties?.action_link) {
+      console.error('generateLink error:', linkError)
+      return NextResponse.json({ ok: true })
+    }
+
+    const recoveryLink = linkData.properties.action_link
+
+    // Envoyer l'email via Resend API directement
+    const fromEmail = process.env.RESEND_FROM_EMAIL ?? 'onboarding@resend.dev'
+    const resendKey = process.env.RESEND_API_KEY
+
+    if (!resendKey) {
+      console.error('RESEND_API_KEY manquant')
+      return NextResponse.json({ ok: true })
+    }
+
+    const emailRes = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${resendKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        from: `PopsJet <${fromEmail}>`,
+        to: [email.trim().toLowerCase()],
+        subject: 'Réinitialisation de votre mot de passe — PopsJet',
+        html: `
+          <div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:32px 24px">
+            <h1 style="font-size:24px;font-weight:700;color:#111">PopsJet</h1>
+            <p style="color:#444;margin-top:16px">Vous avez demandé la réinitialisation de votre mot de passe.</p>
+            <p style="color:#444">Cliquez sur le bouton ci-dessous pour définir un nouveau mot de passe :</p>
+            <a href="${recoveryLink}"
+               style="display:inline-block;margin-top:24px;padding:12px 28px;background:#2563eb;color:#fff;text-decoration:none;border-radius:8px;font-weight:600">
+              Réinitialiser mon mot de passe
+            </a>
+            <p style="color:#888;font-size:13px;margin-top:24px">
+              Ce lien est valable 1 heure. Si vous n'avez pas fait cette demande, ignorez cet email.
+            </p>
+          </div>
+        `,
+      }),
+    })
+
+    if (!emailRes.ok) {
+      const errBody = await emailRes.text()
+      console.error('Resend error:', emailRes.status, errBody)
+    }
 
     return NextResponse.json({ ok: true })
   } catch (err) {
