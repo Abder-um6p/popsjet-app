@@ -58,43 +58,43 @@ export default function ResetPasswordPage() {
 
   useEffect(() => {
     const supabase = createClient()
+    let otpTriggered = false
 
-    async function init() {
-      // Flux PKCE : code dans l'URL
-      const params = new URLSearchParams(window.location.search)
-      const code = params.get('code')
-      if (code) {
-        const { error } = await supabase.auth.exchangeCodeForSession(code)
-        if (!error) {
-          window.history.replaceState({}, '', '/auth/reset-password')
-          await checkUser(supabase)
-          return
-        }
-      }
-
-      // Flux implicite (hash) ou session active
-      const { data: { session } } = await supabase.auth.getSession()
-      if (session) { await checkUser(supabase); return }
-
-      const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-        if ((event === 'PASSWORD_RECOVERY' || event === 'SIGNED_IN') && session) {
-          await checkUser(supabase)
-        }
-      })
-      return () => subscription.unsubscribe()
-    }
-
-    async function checkUser(sb: ReturnType<typeof createClient>) {
-      const { data: { user } } = await sb.auth.getUser()
+    async function handleSession() {
+      const { data: { user } } = await supabase.auth.getUser()
       if (!user) return
       setReady(true)
-      if (user.email?.toLowerCase() === ADMIN_EMAIL.toLowerCase()) {
+      if (user.email?.toLowerCase() === ADMIN_EMAIL.toLowerCase() && !otpTriggered) {
+        otpTriggered = true
         setIsAdmin(true)
         await sendOtp()
       }
     }
 
-    init()
+    // ① S'abonner EN PREMIER (synchrone) pour ne manquer aucun event
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if ((event === 'PASSWORD_RECOVERY' || event === 'SIGNED_IN') && session) {
+        handleSession()
+      }
+    })
+
+    // ② Vérifier la session existante (flux PKCE via callback ou session active)
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session) handleSession()
+    })
+
+    // ③ Flux PKCE direct : ?code= dans l'URL
+    const code = new URLSearchParams(window.location.search).get('code')
+    if (code) {
+      supabase.auth.exchangeCodeForSession(code).then(({ error }) => {
+        if (!error) {
+          window.history.replaceState({}, '', '/auth/reset-password')
+          handleSession()
+        }
+      })
+    }
+
+    return () => subscription.unsubscribe()
   }, [])
 
   // Countdown OTP
