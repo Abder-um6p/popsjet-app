@@ -9,6 +9,7 @@ export default function ForgotPasswordPage() {
   const [email, setEmail] = useState('')
   const [loading, setLoading] = useState(false)
   const [submitted, setSubmitted] = useState(false)
+  const [isAdmin, setIsAdmin] = useState(false)
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -26,6 +27,7 @@ export default function ForgotPasswordPage() {
         toast.error(json.error ?? 'Erreur lors de la demande')
         return
       }
+      setIsAdmin(json.isAdmin ?? false)
       setSubmitted(true)
     } catch {
       toast.error('Erreur réseau, veuillez réessayer')
@@ -54,17 +56,23 @@ export default function ForgotPasswordPage() {
                 <Clock className="w-8 h-8 text-blue-500" />
               </div>
               <div>
-                <h2 className="text-xl font-semibold text-gray-900">Email envoyé !</h2>
+                <h2 className="text-xl font-semibold text-gray-900">
+                  {isAdmin ? 'Email envoyé !' : 'Demande transmise'}
+                </h2>
                 <p className="text-sm text-gray-500 mt-2 leading-relaxed">
-                  Si un compte existe avec cette adresse, vous recevrez un lien
-                  de réinitialisation dans quelques minutes.
+                  {isAdmin
+                    ? 'Un lien de réinitialisation vous a été envoyé. Vérifiez votre boîte de réception.'
+                    : 'Votre demande de réinitialisation a été transmise à l\'administrateur. Merci de le contacter pour accélérer le traitement de votre demande.'
+                  }
                 </p>
               </div>
-              <div className="flex items-start gap-3 p-3 bg-blue-50 border border-blue-100 rounded-xl text-left">
-                <CheckCircle2 className="w-4 h-4 text-blue-500 mt-0.5 shrink-0" />
-                <p className="text-xs text-blue-700">
-                  Vérifiez votre boîte de réception et vos spams.
-                  Le lien est valable 1 heure.
+              <div className={`flex items-start gap-3 p-3 rounded-xl text-left border ${isAdmin ? 'bg-blue-50 border-blue-100' : 'bg-amber-50 border-amber-100'}`}>
+                <CheckCircle2 className={`w-4 h-4 mt-0.5 shrink-0 ${isAdmin ? 'text-blue-500' : 'text-amber-500'}`} />
+                <p className={`text-xs ${isAdmin ? 'text-blue-700' : 'text-amber-700'}`}>
+                  {isAdmin
+                    ? 'Vérifiez vos spams si nécessaire. Le lien est valable 1 heure.'
+                    : 'L\'administrateur recevra votre demande et vous enverra un lien dès validation.'
+                  }
                 </p>
               </div>
               <Link

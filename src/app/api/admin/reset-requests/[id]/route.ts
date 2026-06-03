@@ -68,20 +68,60 @@ export async function PATCH(
   }
 
   if (action === 'approve') {
-    // Use the regular supabase client (anon key) to trigger the reset email
-    // This sends via Supabase's email service
     const adminAuthClient = getAdminAuthClient()
-    const origin = req.headers.get('origin') ?? process.env.NEXT_PUBLIC_APP_URL ?? ''
+    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://popsjet-app.vercel.app'
 
-    const { error: resetError } = await adminAuthClient.auth.resetPasswordForEmail(
-      resetReq.email,
-      { redirectTo: `${origin}/auth/reset-password` }
-    )
+    const { data: linkData, error: linkError } = await adminAuthClient.auth.admin.generateLink({
+      type: 'recovery',
+      email: resetReq.email,
+      options: { redirectTo: `${siteUrl}/auth/reset-password` },
+    })
 
-    if (resetError) {
-      console.error('Reset email error:', resetError)
-      return NextResponse.json({ error: 'Erreur lors de l\'envoi du lien' }, { status: 500 })
+    if (linkError || !linkData?.properties?.action_link) {
+      console.error('generateLink error:', linkError)
+      return NextResponse.json({ error: 'Erreur génération du lien' }, { status: 500 })
     }
+
+    const resendKey = process.env.RESEND_API_KEY
+    if (resendKey) {
+      await fetch('https://api.resend.com/emails', {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${resendKey}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          from: 'PopsJet <onboarding@resend.dev>',
+          to: [resetReq.email],
+          subject: 'Votre demande de réinitialisation a été approuvée — PopsJet',
+          html: `<div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:32px 24px">
+            <h1 style="font-size:24px;font-weight:700;color:#111">PopsJet</h1>
+            <p style="color:#444;margin-top:16px">Votre demande de réinitialisation a été approuvée.</p>
+            <a href="${linkData.properties.action_link}" style="display:inline-block;margin-top:24px;padding:12px 28px;background:#2563eb;color:#fff;text-decoration:none;border-radius:8px;font-weight:600">
+              Réinitialiser mon mot de passe
+            </a>
+            <p style="color:#888;font-size:13px;margin-top:24px">Ce lien est valable 1 heure.</p>
+          </div>`,
+        }),
+      }).catch(e => console.error('Resend error:', e))
+    }
+
+    // Notifier l'utilisateur dans l'app
+    await supabase.from('notifications').insert({
+      user_id: resetReq.user_id,
+      type: 'password_reset_approved',
+      title: 'Demande approuvée',
+      message: 'Votre demande de réinitialisation de mot de passe a été approuvée. Vérifiez votre email.',
+      is_read: false,
+    }).catch(() => {})
+  }
+
+  if (action === 'reject') {
+    // Notifier l'utilisateur du refus
+    await supabase.from('notifications').insert({
+      user_id: resetReq.user_id,
+      type: 'password_reset_rejected',
+      title: 'Demande refusée',
+      message: note ? `Votre demande a été refusée : ${note}` : 'Votre demande de réinitialisation de mot de passe a été refusée.',
+      is_read: false,
+    }).catch(() => {})
   }
 
   // Update request status
