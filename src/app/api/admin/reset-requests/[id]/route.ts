@@ -3,7 +3,7 @@ import { createServerClient } from '@supabase/ssr'
 import { createClient } from '@supabase/supabase-js'
 import { cookies } from 'next/headers'
 
-const RESEND_FROM = process.env.RESEND_FROM_EMAIL ?? 'PopsJet <onboarding@resend.dev>'
+const RESEND_FROM = 'PopsJet <onboarding@resend.dev>'
 
 function getAdminAuthClient() {
   return createClient(

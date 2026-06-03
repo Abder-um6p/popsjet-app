@@ -11,7 +11,7 @@ function getAdminClient() {
   )
 }
 
-const RESEND_FROM = process.env.RESEND_FROM_EMAIL ?? 'PopsJet <onboarding@resend.dev>'
+const RESEND_FROM = 'PopsJet <onboarding@resend.dev>'
 
 async function sendViaResend(to: string, subject: string, html: string) {
   const resendKey = process.env.RESEND_API_KEY

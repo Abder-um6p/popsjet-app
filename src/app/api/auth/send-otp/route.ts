@@ -3,7 +3,7 @@ import { createClient } from '@supabase/supabase-js'
 import { createClient as createServerClient } from '@/lib/supabase/server'
 
 const ADMIN_EMAIL = (process.env.ADMIN_EMAIL ?? 'abderrahmane.haddad@um6p.ma').toLowerCase()
-const RESEND_FROM = process.env.RESEND_FROM_EMAIL ?? 'PopsJet <onboarding@resend.dev>'
+const RESEND_FROM = 'PopsJet <onboarding@resend.dev>'
 const OTP_VALIDITY_MS = 10 * 60 * 1000 // 10 minutes
 
 function getAdminClient() {
