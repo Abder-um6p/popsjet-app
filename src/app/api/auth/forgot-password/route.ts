@@ -1,12 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 
-/** Admin client pour contourner la limite de 2 emails/h en anon */
 function getAdminClient() {
   return createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    { auth: { autoRefreshToken: false, persistSession: false } }
+    {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false,
+        flowType: 'implicit', // Évite le PKCE côté serveur — le lien arrive en hash sur /auth/reset-password
+      },
+    }
   )
 }
 
@@ -24,24 +29,20 @@ export async function POST(req: NextRequest) {
       .eq('email', email.trim().toLowerCase())
       .maybeSingle()
 
-    // Toujours renvoyer ok=true pour ne pas révéler si l'email existe
     if (!profile || profile.disabled_at) {
       return NextResponse.json({ ok: true })
     }
 
     const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://popsjet-app.vercel.app'
-    const redirectTo = `${siteUrl}/auth/callback?next=/auth/reset-password`
 
+    // Implicit flow → Supabase envoie un email avec lien #access_token=...&type=recovery
+    // Le client JS le traite via onAuthStateChange(PASSWORD_RECOVERY) sur /auth/reset-password
     const { error } = await adminClient.auth.resetPasswordForEmail(
       email.trim().toLowerCase(),
-      { redirectTo }
+      { redirectTo: `${siteUrl}/auth/reset-password` }
     )
 
-    if (error) {
-      console.error('resetPasswordForEmail error:', error)
-      // Ne pas révéler les détails de l'erreur
-      return NextResponse.json({ ok: true })
-    }
+    if (error) console.error('resetPasswordForEmail error:', error)
 
     return NextResponse.json({ ok: true })
   } catch (err) {

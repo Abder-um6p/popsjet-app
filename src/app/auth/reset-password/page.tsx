@@ -76,19 +76,35 @@ export default function ResetPasswordPage() {
   useEffect(() => {
     const supabase = createClient()
 
-    // Vérifier la session existante (flux PKCE via callback)
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session) setReady(true)
-    })
+    async function init() {
+      // Flux PKCE : le lien email contient ?code=... directement sur cette page
+      const params = new URLSearchParams(window.location.search)
+      const code = params.get('code')
 
-    // Écouter les événements auth — PASSWORD_RECOVERY (hash) ou SIGNED_IN (PKCE)
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      if (event === 'PASSWORD_RECOVERY' || (event === 'SIGNED_IN' && session)) {
-        setReady(true)
+      if (code) {
+        const { error } = await supabase.auth.exchangeCodeForSession(code)
+        if (!error) {
+          setReady(true)
+          // Nettoyer l'URL sans recharger la page
+          window.history.replaceState({}, '', '/auth/reset-password')
+          return
+        }
       }
-    })
 
-    return () => subscription.unsubscribe()
+      // Flux implicite (hash) ou session déjà active
+      const { data: { session } } = await supabase.auth.getSession()
+      if (session) { setReady(true); return }
+
+      // Écouter PASSWORD_RECOVERY (hash) ou SIGNED_IN
+      const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+        if (event === 'PASSWORD_RECOVERY' || (event === 'SIGNED_IN' && session)) {
+          setReady(true)
+        }
+      })
+      return () => subscription.unsubscribe()
+    }
+
+    init()
   }, [])
 
   async function handleSubmit(e: React.FormEvent) {

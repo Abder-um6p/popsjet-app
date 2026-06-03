@@ -7,7 +7,7 @@ function getAdminAuthClient() {
   return createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    { auth: { autoRefreshToken: false, persistSession: false } }
+    { auth: { autoRefreshToken: false, persistSession: false, flowType: 'implicit' } }
   )
 }
 
@@ -45,7 +45,7 @@ export async function POST(req: Request) {
     data: { role, invited_by: user.id },
     // Après clic sur le lien → callback échange le token → redirect vers reset-password
     // L'utilisateur invité définit son mot de passe, puis est redirigé vers l'onboarding
-    redirectTo: `${siteUrl}/auth/callback?next=/auth/reset-password`,
+    redirectTo: `${siteUrl}/auth/reset-password`,
   })
 
   if (inviteError) {

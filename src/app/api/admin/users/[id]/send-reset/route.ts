@@ -7,7 +7,7 @@ function getAdminAuthClient() {
   return createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    { auth: { autoRefreshToken: false, persistSession: false } }
+    { auth: { autoRefreshToken: false, persistSession: false, flowType: 'implicit' } }
   )
 }
 
@@ -68,7 +68,7 @@ export async function POST(
 
   const { error: resetError } = await adminAuthClient.auth.resetPasswordForEmail(
     targetProfile.email,
-    { redirectTo: `${siteUrl}/auth/callback?next=/auth/reset-password` }
+    { redirectTo: `${siteUrl}/auth/reset-password` }
   )
 
   if (resetError) {
