@@ -15,25 +15,26 @@ export async function POST(req: NextRequest) {
     if (!email) return NextResponse.json({ error: 'Email requis' }, { status: 400 })
 
     const adminClient = getAdminClient()
+    const normalizedEmail = email.trim().toLowerCase()
 
     // Vérifier que le compte existe et n'est pas désactivé
     const { data: profile } = await adminClient
       .from('profiles')
       .select('id, disabled_at')
-      .eq('email', email.trim().toLowerCase())
+      .eq('email', normalizedEmail)
       .maybeSingle()
 
+    // Toujours ok pour ne pas révéler si l'email existe
     if (!profile || profile.disabled_at) {
       return NextResponse.json({ ok: true })
     }
 
     const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://popsjet-app.vercel.app'
 
-    // Générer le lien de récupération via l'API admin (pas de PKCE)
-    // Le lien redirige vers /auth/reset-password#access_token=...&type=recovery
+    // Générer le lien de récupération (pas de PKCE, flux implicite)
     const { data: linkData, error: linkError } = await adminClient.auth.admin.generateLink({
       type: 'recovery',
-      email: email.trim().toLowerCase(),
+      email: normalizedEmail,
       options: { redirectTo: `${siteUrl}/auth/reset-password` },
     })
 
@@ -43,15 +44,15 @@ export async function POST(req: NextRequest) {
     }
 
     const recoveryLink = linkData.properties.action_link
-
-    // Envoyer l'email via Resend API directement
-    const fromEmail = process.env.RESEND_FROM_EMAIL ?? 'onboarding@resend.dev'
     const resendKey = process.env.RESEND_API_KEY
 
     if (!resendKey) {
       console.error('RESEND_API_KEY manquant')
       return NextResponse.json({ ok: true })
     }
+
+    // Toujours utiliser onboarding@resend.dev si le domaine custom n'est pas vérifié
+    const fromEmail = 'onboarding@resend.dev'
 
     const emailRes = await fetch('https://api.resend.com/emails', {
       method: 'POST',
@@ -61,7 +62,7 @@ export async function POST(req: NextRequest) {
       },
       body: JSON.stringify({
         from: `PopsJet <${fromEmail}>`,
-        to: [email.trim().toLowerCase()],
+        to: [normalizedEmail],
         subject: 'Réinitialisation de votre mot de passe — PopsJet',
         html: `
           <div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:32px 24px">
@@ -82,8 +83,15 @@ export async function POST(req: NextRequest) {
 
     if (!emailRes.ok) {
       const errBody = await emailRes.text()
-      console.error('Resend error:', emailRes.status, errBody)
+      console.error('Resend send error:', emailRes.status, errBody)
     }
+
+    // Créer aussi une demande dans password_reset_requests pour le suivi admin
+    await adminClient.from('password_reset_requests').insert({
+      user_id: profile.id,
+      email: normalizedEmail,
+      status: 'approved', // Directement approuvé — email déjà envoyé
+    }).then(() => {}).catch(() => {}) // Non-bloquant
 
     return NextResponse.json({ ok: true })
   } catch (err) {

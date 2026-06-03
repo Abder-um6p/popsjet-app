@@ -76,7 +76,7 @@ export async function POST(
   }
 
   const recoveryLink = linkData.properties.action_link
-  const fromEmail = process.env.RESEND_FROM_EMAIL ?? 'onboarding@resend.dev'
+  const fromEmail = 'onboarding@resend.dev' // domaine vérifié Resend — changer après vérification @um6p.ma
   const resendKey = process.env.RESEND_API_KEY
 
   if (!resendKey) {
