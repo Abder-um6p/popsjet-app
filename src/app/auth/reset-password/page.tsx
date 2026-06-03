@@ -50,6 +50,7 @@ export default function ResetPasswordPage() {
   const [loading, setLoading] = useState(false)
   const [ready, setReady] = useState(false)
   const [done, setDone] = useState(false)
+  const [linkError, setLinkError] = useState<string | null>(null)
   const [isAdmin, setIsAdmin] = useState(false)
   const [otpSent, setOtpSent] = useState(false)
   const [otpExpiry, setOtpExpiry] = useState<Date | null>(null)
@@ -57,6 +58,19 @@ export default function ResetPasswordPage() {
   const [otpCountdown, setOtpCountdown] = useState(0)
 
   useEffect(() => {
+    // ⓪ Détecter une erreur dans le hash de l'URL (#error=access_denied...)
+    const hash = window.location.hash.substring(1)
+    if (hash) {
+      const hashParams = new URLSearchParams(hash)
+      const hashError = hashParams.get('error')
+      if (hashError) {
+        const desc = hashParams.get('error_description')?.replace(/\+/g, ' ') ?? 'Lien invalide ou expiré'
+        setLinkError(desc)
+        window.history.replaceState({}, '', '/auth/reset-password')
+        return
+      }
+    }
+
     const supabase = createClient()
     let otpTriggered = false
 
@@ -177,7 +191,29 @@ export default function ResetPasswordPage() {
         </div>
 
         <div className="bg-white rounded-2xl shadow-lg p-8">
-          {done ? (
+          {linkError ? (
+            <div className="text-center space-y-4">
+              <div className="w-16 h-16 rounded-full bg-red-50 flex items-center justify-center mx-auto">
+                <XCircle className="w-8 h-8 text-red-500" />
+              </div>
+              <div>
+                <h2 className="text-xl font-semibold text-gray-900">Lien expiré</h2>
+                <p className="text-sm text-gray-500 mt-2 leading-relaxed">
+                  Ce lien de réinitialisation est invalide ou a expiré.<br />
+                  Veuillez soumettre une nouvelle demande.
+                </p>
+              </div>
+              <div className="p-3 bg-red-50 border border-red-100 rounded-xl text-left">
+                <p className="text-xs text-red-600">{linkError}</p>
+              </div>
+              <Link
+                href="/auth/forgot-password"
+                className="inline-flex items-center gap-2 px-5 py-2.5 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition"
+              >
+                Faire une nouvelle demande
+              </Link>
+            </div>
+          ) : done ? (
             <div className="text-center space-y-4">
               <div className="w-16 h-16 rounded-full bg-green-50 flex items-center justify-center mx-auto">
                 <CheckCircle2 className="w-8 h-8 text-green-500" />
