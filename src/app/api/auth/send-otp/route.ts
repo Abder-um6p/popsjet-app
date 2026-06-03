@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js'
 import { createClient as createServerClient } from '@/lib/supabase/server'
 
 const ADMIN_EMAIL = (process.env.ADMIN_EMAIL ?? 'abderrahmane.haddad@um6p.ma').toLowerCase()
+const RESEND_FROM = process.env.RESEND_FROM_EMAIL ?? 'PopsJet <onboarding@resend.dev>'
 const OTP_VALIDITY_MS = 10 * 60 * 1000 // 10 minutes
 
 function getAdminClient() {
@@ -63,7 +64,7 @@ export async function POST(_req: NextRequest) {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${resendKey}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          from: 'PopsJet <onboarding@resend.dev>',
+          from: RESEND_FROM,
           to: [user.email],
           subject: 'Votre code de vérification — PopsJet',
           html: `<div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:32px 24px">

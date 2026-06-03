@@ -11,6 +11,8 @@ function getAdminClient() {
   )
 }
 
+const RESEND_FROM = process.env.RESEND_FROM_EMAIL ?? 'PopsJet <onboarding@resend.dev>'
+
 async function sendViaResend(to: string, subject: string, html: string) {
   const resendKey = process.env.RESEND_API_KEY
   if (!resendKey) { console.error('RESEND_API_KEY missing'); return false }
@@ -18,9 +20,9 @@ async function sendViaResend(to: string, subject: string, html: string) {
   const res = await fetch('https://api.resend.com/emails', {
     method: 'POST',
     headers: { 'Authorization': `Bearer ${resendKey}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ from: 'PopsJet <onboarding@resend.dev>', to: [to], subject, html }),
+    body: JSON.stringify({ from: RESEND_FROM, to: [to], subject, html }),
   })
-  if (!res.ok) { console.error('Resend error:', await res.text()); return false }
+  if (!res.ok) { console.error(`Resend error ${res.status}:`, await res.text()); return false }
   return true
 }
 
