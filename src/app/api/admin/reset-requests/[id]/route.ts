@@ -3,30 +3,12 @@ import { createServerClient } from '@supabase/ssr'
 import { createClient } from '@supabase/supabase-js'
 import { cookies } from 'next/headers'
 
-const RESEND_FROM = 'PopsJet <onboarding@resend.dev>'
-
 function getAdminAuthClient() {
   return createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!,
     { auth: { autoRefreshToken: false, persistSession: false } }
   )
-}
-
-async function sendViaResend(to: string, subject: string, html: string): Promise<boolean> {
-  const resendKey = process.env.RESEND_API_KEY
-  if (!resendKey) { console.error('RESEND_API_KEY missing'); return false }
-  const res = await fetch('https://api.resend.com/emails', {
-    method: 'POST',
-    headers: { 'Authorization': `Bearer ${resendKey}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ from: RESEND_FROM, to: [to], subject, html }),
-  })
-  if (!res.ok) {
-    const body = await res.text()
-    console.error(`Resend error ${res.status}:`, body)
-    return false
-  }
-  return true
 }
 
 async function getAdminUser(supabase: ReturnType<typeof createServerClient>) {
@@ -90,32 +72,15 @@ export async function PATCH(
   if (action === 'approve') {
     const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://popsjet-app.vercel.app'
 
-    const { data: linkData, error: linkError } = await adminClient.auth.admin.generateLink({
-      type: 'recovery',
-      email: resetReq.email,
-      options: { redirectTo: `${siteUrl}/auth/reset-password` },
-    })
-
-    if (linkError || !linkData?.properties?.action_link) {
-      console.error('generateLink error:', linkError)
-      return NextResponse.json({ error: 'Erreur génération du lien' }, { status: 500 })
-    }
-
-    const emailSent = await sendViaResend(
+    // Utilise l'email intégré Supabase (pas besoin de domaine Resend vérifié)
+    const { error: resetError } = await adminClient.auth.resetPasswordForEmail(
       resetReq.email,
-      'Votre demande de réinitialisation a été approuvée — PopsJet',
-      `<div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:32px 24px">
-        <h1 style="font-size:24px;font-weight:700;color:#111">PopsJet</h1>
-        <p style="color:#444;margin-top:16px">Votre demande de réinitialisation a été approuvée.</p>
-        <a href="${linkData.properties.action_link}" style="display:inline-block;margin-top:24px;padding:12px 28px;background:#2563eb;color:#fff;text-decoration:none;border-radius:8px;font-weight:600">
-          Réinitialiser mon mot de passe
-        </a>
-        <p style="color:#888;font-size:13px;margin-top:24px">Ce lien est valable 1 heure.</p>
-      </div>`
+      { redirectTo: `${siteUrl}/auth/reset-password` }
     )
 
-    if (!emailSent) {
-      return NextResponse.json({ error: 'Erreur envoi email — vérifiez les logs Resend' }, { status: 500 })
+    if (resetError) {
+      console.error('resetPasswordForEmail error:', resetError)
+      return NextResponse.json({ error: 'Erreur envoi email de réinitialisation' }, { status: 500 })
     }
 
     // Notifier l'utilisateur dans l'app (service role, pas de problème RLS)
