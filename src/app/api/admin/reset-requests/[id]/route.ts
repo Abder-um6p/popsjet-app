@@ -110,7 +110,7 @@ export async function PATCH(
       title: 'Demande approuvée',
       message: 'Votre demande de réinitialisation de mot de passe a été approuvée. Vérifiez votre email.',
       is_read: false,
-    }).catch(() => {})
+    })
   }
 
   if (action === 'reject') {
@@ -121,7 +121,7 @@ export async function PATCH(
       title: 'Demande refusée',
       message: note ? `Votre demande a été refusée : ${note}` : 'Votre demande de réinitialisation de mot de passe a été refusée.',
       is_read: false,
-    }).catch(() => {})
+    })
   }
 
   // Update request status

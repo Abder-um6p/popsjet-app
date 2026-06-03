@@ -110,7 +110,7 @@ export async function POST(req: NextRequest) {
             title: 'Demande de réinitialisation',
             message: `${profile.full_name || profile.email} demande la réinitialisation de son mot de passe.`,
             is_read: false,
-          }).catch(() => {})
+          })
         }
 
         // Email optionnel à l'admin
